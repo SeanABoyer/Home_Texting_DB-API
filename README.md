@@ -3,7 +3,7 @@ A DataBase/API for the Desktop and Mobile Home Texting Apps
 
 ## How to install on raspberryPi
 	-SSH to raspberryPi
+	-mkdir /usr/local/bin/HomeTextService && cd /usr/local/bin/HomeTextService
 	-wget https://github.com/SeanABoyer/Home_Texting_DB-API/archive/master.zip
-	-unzip master.zip
-	-cd Home_Texting_DB-API-master
-	-pip install -r requirements.txt
+	-unzip -j master.zip
+
