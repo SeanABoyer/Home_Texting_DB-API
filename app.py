@@ -239,6 +239,16 @@ def bad_request(error):
     return make_response(jsonify({"ERROR":str(error)}),400)
 
 
+@app.route('/validIP/', methods=['GET'])
+def validIP():
+    return jsonify({"answer":"True"})
+
+@app.route('/validLogin/', methods=['GET'])
+@auth.login_required
+def validLogin():
+    return jsonify({"answer":"True"})
+
+
 if __name__ == '__main__':
     if debug:
         db.drop_all()
