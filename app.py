@@ -124,15 +124,12 @@ def TestData():
 @app.route('/message/', methods=['POST'])
 @auth.login_required
 def API_create_message():
-    jsonMustHave = ["phone_number","to","from","message","type"]
+    jsonMustHave = ["phone_number","to","from","message","client"]
     if not request.json or not set(jsonMustHave).issubset(set(request.json)):
         abort(400,"JSON Request must contain:"+str(jsonMustHave))
         
     if request.json["to"] != request.json["phone_number"] and request.json["from"] != request.json["phone_number"]:
         abort(404)
-    possibleTypes = ["mobile","desktop"]
-    if not request.json["type"] not in possibleTypes:
-        abort(404,"Type must be one of the following:"+str(possibleTypes))
         
     try:
         conversation = retrieve_conversation(request.json["phone_number"])
@@ -146,8 +143,8 @@ def API_create_message():
     db.session.add(messageObj)
     db.session.commit()
     client.connect("0.0.0.0",1883,60)
-    mqtt_message = {"conversation_phone_number":request.json["phone_number"],
-     "message_sent_from":request.json["type"]}
+    mqtt_message = {"phone_number":request.json["phone_number"],
+     "client":request.json["client"]}
     client.publish(g_user["USERNAME"],str(mqtt_message))
     client.disconnect()
     return jsonify(messageObj.asJsonObj())
