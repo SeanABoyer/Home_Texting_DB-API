@@ -130,6 +130,9 @@ def API_create_message():
         
     if request.json["to"] != request.json["phone_number"] and request.json["from"] != request.json["phone_number"]:
         abort(404)
+    possibleTypes = ["mobile","desktop"]
+    if not request.json["type"] not in possibleTypes:
+        abort(404,"Type must be one of the following:"+str(possibleTypes))
         
     try:
         conversation = retrieve_conversation(request.json["phone_number"])
@@ -143,7 +146,9 @@ def API_create_message():
     db.session.add(messageObj)
     db.session.commit()
     client.connect("0.0.0.0",1883,60)
-    client.publish(g_user["USERNAME"]+"/"+request.json["phone_number"],request.json["type"])
+    mqtt_message = {"conversation_phone_number":request.json["phone_number"],
+     "message_sent_from":request.json["type"]}
+    client.publish(g_user["USERNAME"],mqtt_message)
     client.disconnect()
     return jsonify(messageObj.asJsonObj())
 
