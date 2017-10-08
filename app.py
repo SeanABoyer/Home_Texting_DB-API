@@ -142,7 +142,9 @@ def API_create_message():
                    conversation_id=conversation.id)
     db.session.add(messageObj)
     db.session.commit()
+    client.connect("0.0.0.0",1883,60)
     client.publish(g_user["USERNAME"]+"/"+request.json["phone_number"],request.json["type"])
+    client.disconnect()
     return jsonify(messageObj.asJsonObj())
 
 
@@ -238,6 +240,9 @@ def validIP():
 def validLogin():
     return jsonify({"answer":"True"})
 
+################################################################################
+#                                MQTT
+################################################################################
 
 if __name__ == '__main__':
     if debug:
@@ -248,7 +253,6 @@ if __name__ == '__main__':
         if not os.path.isfile(DatabaseFile):
             db.create_all()
 client = mqtt.Client("HomeText")
-client.connect("0.0.0.0",1883,60)
 app.run(host="0.0.0.0",port=80)
 
     
