@@ -1,6 +1,7 @@
 #!/usr/bin/env/python3
 import datetime
 import os.path
+import paho.mqtt.client as mqtt
 
 from passlib.apps import custom_app_context 
 from flask import Flask, jsonify, abort, make_response
@@ -15,7 +16,7 @@ app = Flask(__name__)
 app.config.from_object('config')
 db = SQLAlchemy(app)
 auth = HTTPBasicAuth()
-userID = None
+g_user = None
  
 ################################################################################
 #                                MODELS
@@ -59,23 +60,6 @@ class Message(db.Model):
                    "TIME":self.time
             }
         return message
-# class Device(db.Model):
-#     __tablename__ = "Device"
-#     id = db.Column(db.Integer, primary_key=True)
-#     macAddress = db.Column(db.String(23), unique=True, nullable=False)
-#     deviceName = db.Column(db.String(30), nullable=True)
-#     user_id = db.Column(db.Integer, db.ForeignKey('User.id'), nullable=False)
-#     user = db.relationship('User',backref=db.backref('Device',lazy=True))
-# 
-#     def __repr__(self):
-#         return '<Device %r>' % self.macAddress
-#     
-#     def asJsonObj(self):
-#         device = {"ID":self.id,
-#                   "MACADDRESS":self.macAddress,
-#                 "DEVICENAME":self.deviceName    
-#         }
-#         return device
 class Conversation(db.Model):
     __tablename__ = "Conversation"
     id = db.Column(db.Integer, primary_key=True)
@@ -140,7 +124,7 @@ def TestData():
 @app.route('/message/', methods=['POST'])
 @auth.login_required
 def API_create_message():
-    jsonMustHave = ["phone_number","to","from","message"]
+    jsonMustHave = ["phone_number","to","from","message","type"]
     if not request.json or not set(jsonMustHave).issubset(set(request.json)):
         abort(400,"JSON Request must contain:"+str(jsonMustHave))
         
@@ -158,6 +142,7 @@ def API_create_message():
                    conversation_id=conversation.id)
     db.session.add(messageObj)
     db.session.commit()
+    client.publish(g_user["USERNAME"]+"/"+request.json["phone_number"],request.json["type"])
     return jsonify(messageObj.asJsonObj())
 
 
@@ -184,13 +169,13 @@ def API_retrieve_messages_with_start(phone_number,start):
 #                                CONVERSATION
 ################################################################################
 def create_conversation(conversation_phone_number):
-    conversationObj = Conversation(phoneNumber=conversation_phone_number,user_id=userID)
+    conversationObj = Conversation(phoneNumber=conversation_phone_number,user_id=g_user["ID"])
     db.session.add(conversationObj)
     db.session.commit()
     return conversationObj
 
 def retrieve_conversation(conversation_phone_number):
-    conversationObj = Conversation.query.filter_by(user_id=userID,phoneNumber=conversation_phone_number).first()
+    conversationObj = Conversation.query.filter_by(user_id=g_user["ID"],phoneNumber=conversation_phone_number).first()
     if conversationObj is None:
         raise NotFound
     return conversationObj
@@ -227,13 +212,18 @@ def verify_password(username,password):
     if userObj is None:
         return False
 
-    global userID
-    userID = userObj.asJsonObj()["ID"]
+    global user
+    
+    g_user = userObj.asJsonObj()
+    del g_user["PASSWORD"]
     return custom_app_context.verify(password, userObj.asJsonObj()["PASSWORD"])
 
 @app.errorhandler(404)
 def not_found(error):
     return make_response(jsonify({"ERROR":"Not Found"}),404)
+@app.errorhandler(401)
+def unauth_access(error):
+    return make_response(jsonify({"ERROR":"Unauthorized Access"}),401)
 @app.errorhandler(400)
 def bad_request(error):
     return make_response(jsonify({"ERROR":str(error)}),400)
@@ -257,5 +247,8 @@ if __name__ == '__main__':
     else:
         if not os.path.isfile(DatabaseFile):
             db.create_all()
+client = mqtt.Client("HomeText")
+client.connect("0.0.0.0",1883,60)
 app.run(host="0.0.0.0",port=80)
+
     
