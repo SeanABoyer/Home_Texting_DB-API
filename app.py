@@ -214,7 +214,7 @@ def verify_password(username,password):
     if userObj is None:
         return False
 
-    global user
+    global g_user
     
     g_user = userObj.asJsonObj()
     del g_user["PASSWORD"]
