@@ -148,7 +148,7 @@ def API_create_message():
     client.connect("0.0.0.0",1883,60)
     mqtt_message = {"conversation_phone_number":request.json["phone_number"],
      "message_sent_from":request.json["type"]}
-    client.publish(g_user["USERNAME"],mqtt_message)
+    client.publish(g_user["USERNAME"],str(mqtt_message))
     client.disconnect()
     return jsonify(messageObj.asJsonObj())
 
