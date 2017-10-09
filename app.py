@@ -142,14 +142,23 @@ def API_create_message():
                    conversation_id=conversation.id)
     db.session.add(messageObj)
     db.session.commit()
+    
     client.connect("0.0.0.0",1883,60)
-    mqtt_message = {"phone_number":request.json["phone_number"],
-     "client":request.json["client"]}
+    mqtt_message = {
+        "phone_number":request.json["phone_number"],
+        "client":request.json["client"],
+        "id":messageObj.asJsonObj["ID"]}
     client.publish(g_user["USERNAME"],str(mqtt_message))
     client.disconnect()
+    
     return jsonify(messageObj.asJsonObj())
 
-
+@app.route("/message/<phone_number>/<id>",methods=['GET'])
+@auth.login_required
+def API_retrieve_message_by_id(phone_number,ID):
+    conversation = retrieve_conversation(phone_number);
+    messageobj = Message.query.filter(Message.conversation_id==conversation.id,Message.id==ID)
+    return jsonify(messageobj.asJsonObj())
 @app.route('/message/<phone_number>/', methods=['GET'])
 @auth.login_required
 def API_retrieve_messages(phone_number):
