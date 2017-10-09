@@ -1,4 +1,4 @@
-#!/usr/bin/env/python3
+#!/usr/bin/env/python
 import datetime
 import os.path
 import paho.mqtt.client as mqtt
@@ -147,8 +147,8 @@ def API_create_message():
     mqtt_message = {
         "phone_number":request.json["phone_number"],
         "client":request.json["client"],
-        "id":messageObj.asJsonObj["ID"]}
-    client.publish(g_user["USERNAME"],str(mqtt_message))
+        "id":messageObj.id}
+    client.publish(g_user["USERNAME"],str(jsonify(mqtt_message)))
     client.disconnect()
     
     return jsonify(messageObj.asJsonObj())
