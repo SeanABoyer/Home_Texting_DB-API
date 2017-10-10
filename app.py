@@ -4,7 +4,7 @@ import os.path
 import paho.mqtt.client as mqtt
 
 from passlib.apps import custom_app_context 
-from flask import Flask, jsonify, abort, make_response
+from flask import Flask, jsonify, abort, make_response, json
 from flask.globals import request
 from flask_httpauth import HTTPBasicAuth
 from flask_sqlalchemy import SQLAlchemy
@@ -148,16 +148,16 @@ def API_create_message():
         "phone_number":request.json["phone_number"],
         "client":request.json["client"],
         "id":messageObj.id}
-    client.publish(g_user["USERNAME"],str(jsonify(mqtt_message)))
+    client.publish(g_user["USERNAME"],json.dumps(mqtt_message))
     client.disconnect()
     
     return jsonify(messageObj.asJsonObj())
 
-@app.route("/message/<phone_number>/<id>",methods=['GET'])
+@app.route("/message/<phone_number>/<msg_id>",methods=['GET'])
 @auth.login_required
-def API_retrieve_message_by_id(phone_number,ID):
+def API_retrieve_message_by_id(phone_number,msg_id):
     conversation = retrieve_conversation(phone_number);
-    messageobj = Message.query.filter(Message.conversation_id==conversation.id,Message.id==ID)
+    messageobj = Message.query.filter(Message.conversation_id==conversation.id,Message.id==msg_id).first()
     return jsonify(messageobj.asJsonObj())
 @app.route('/message/<phone_number>/', methods=['GET'])
 @auth.login_required
