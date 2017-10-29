@@ -150,7 +150,7 @@ def API_create_message():
         "id":messageObj.id}
     client.publish(g_user["USERNAME"],json.dumps(mqtt_message))
     client.disconnect()
-    
+     
     return jsonify(messageObj.asJsonObj())
 
 @app.route("/message/<phone_number>/<msg_id>",methods=['GET'])
@@ -251,9 +251,9 @@ def validIP():
 def validLogin():
     return jsonify({"answer":"True"})
 
-################################################################################
-#                                MQTT
-################################################################################
+
+
+
 
 if __name__ == '__main__':
     if debug:
@@ -266,4 +266,29 @@ if __name__ == '__main__':
 client = mqtt.Client("HomeText")
 app.run(host="0.0.0.0",port=80)
 
+
+
+##############################################
+#                CONVERSATION                #
+##############################################
+@app.route('/conversation/', methods=['GET'])
+@auth.login_required
+def retrieveAllConverstaions():
+    ConverastionArray = Conversation.query.filter(Conversation.user_id == g_user["ID"]).all()
+    convArrayInJson = []
+    for convObj in ConverastionArray:
+        convArrayInJson.append(convObj.asJsonObj())
+    return jsonify(convArrayInJson)
+
+#########################################
+#                MESSAGE                #
+#########################################
+@app.route('/message/<phone_number>', methods=['GET'])
+@auth.login_required
+def retrieveAllMessages(phone_number):
+    messageArray = Message.query.filter(Message.from_phoneNumber == phone_number).all()
+    messageArrayInJson = []
+    for msg in messageArray:
+        messageArrayInJson.append(msg.asJsonObj())
+    return jsonify(messageArrayInJson)
     
