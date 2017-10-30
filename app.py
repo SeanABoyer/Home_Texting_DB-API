@@ -94,8 +94,7 @@ class Contact(db.Model):
                    "FIRSTNAME":self.firstName,
                    "LASTNAME":self.lastName
         }
-        return contact    
-    
+        return contact   
 def TestData():
     user = User(username="Steve",password=custom_app_context.hash("S3cert"))
 #     device = Device(macAddress="0000000000000002",user=user,deviceName="Steve' Phone")
@@ -118,12 +117,53 @@ def TestData():
     db.session.add(user)
     db.session.commit()
 
-################################################################################
-#                                MESSAGE
-################################################################################
+
+##############################################
+#                CONVERSATION                #
+##############################################
+@app.route('/conversation/', methods=['GET'])
+@auth.login_required
+def retrieveAllConverstaions():
+    ConverastionArray = Conversation.query.filter(Conversation.user_id == g_user["ID"]).all()
+    convArrayInJson = []
+    for convObj in ConverastionArray:
+        convArrayInJson.append(convObj.asJsonObj())
+    return jsonify(convArrayInJson)
+
+@app.route('/conversation/<phone_number>/', methods=['GET'])
+@auth.login_required
+def retrieveConversationByPhoneNumber(phone_number):
+    return jsonify(_retrieveConversation(phone_number).asJsonObj())
+
+def _createConversation(conversation_phone_number):
+    conversationObj = Conversation(phoneNumber=conversation_phone_number,user_id=g_user["ID"])
+    db.session.add(conversationObj)
+    db.session.commit()
+    return conversationObj
+
+def _retrieveConversation(conversation_phone_number):
+    conversationObj = Conversation.query.filter_by(user_id=g_user["ID"],phoneNumber=conversation_phone_number).first()
+    if conversationObj is None:
+        raise NotFound
+    return conversationObj
+#########################################
+#                MESSAGE                #
+#########################################
+@app.route('/message/<phone_number>/', methods=['GET'])
+@auth.login_required
+def retrieveAllMessages(phone_number):
+    return retrieveMessageByPhoneNumber(phone_number,0)
+
+@app.route("/messageByID/<phone_number>/<msg_id>/",methods=['GET'])
+@auth.login_required
+def retrieveMessageByID(phone_number,msg_id):
+    conversation = _retrieveConversation(phone_number);
+    messageobj = Message.query.filter(Message.conversation_id==conversation.id,Message.id==msg_id).first()
+    return jsonify(messageobj.asJsonObj())
+
 @app.route('/message/', methods=['POST'])
 @auth.login_required
-def API_create_message():
+def createMessage():
     jsonMustHave = ["phone_number","to","from","message","client"]
     if not request.json or not set(jsonMustHave).issubset(set(request.json)):
         abort(400,"JSON Request must contain:"+str(jsonMustHave))
@@ -132,9 +172,9 @@ def API_create_message():
         abort(404)
         
     try:
-        conversation = retrieve_conversation(request.json["phone_number"])
+        conversation = _retrieveConversation(request.json["phone_number"])
     except NotFound:
-        conversation = create_conversation(request.json["phone_number"])
+        conversation = _createConversation(request.json["phone_number"])
     messageObj = Message(to_phoneNumber=request.json["to"],
                    from_phoneNumber=request.json["from"],
                    message=request.json["message"],
@@ -142,7 +182,7 @@ def API_create_message():
                    conversation_id=conversation.id)
     db.session.add(messageObj)
     db.session.commit()
-    
+     
     client.connect("0.0.0.0",1883,60)
     mqtt_message = {
         "phone_number":request.json["phone_number"],
@@ -150,26 +190,20 @@ def API_create_message():
         "id":messageObj.id}
     client.publish(g_user["USERNAME"],json.dumps(mqtt_message))
     client.disconnect()
-     
+      
     return jsonify(messageObj.asJsonObj())
 
-@app.route("/message/<phone_number>/<msg_id>",methods=['GET'])
+@app.route('/messageByTime/<phone_number>/<start>/', methods=['GET'])
 @auth.login_required
-def API_retrieve_message_by_id(phone_number,msg_id):
-    conversation = retrieve_conversation(phone_number);
-    messageobj = Message.query.filter(Message.conversation_id==conversation.id,Message.id==msg_id).first()
-    return jsonify(messageobj.asJsonObj())
-@app.route('/message/<phone_number>/', methods=['GET'])
-@auth.login_required
-def API_retrieve_messages(phone_number):
-    return API_retrieve_messages_with_start(phone_number,0)
-
-@app.route('/message/<phone_number>/<start>', methods=['GET'])
-@auth.login_required
-def API_retrieve_messages_with_start(phone_number,start):
+def retrieveMessageByPhoneNumber(phone_number,start):
+    #Start = how many mintues back, 0 returns all
+    try:
+        start = int(start)
+    except ValueError:
+        abort(400,start+" is not a valid number.")
     messages = []
-    conversation = retrieve_conversation(phone_number)
-    if start == 0:
+    conversation = _retrieveConversation(phone_number)
+    if int(start) == 0:
         messagesObj = Message.query.filter_by(conversation_id=conversation.id).all()
     else:
         messagesObj = Message.query.filter(Message.conversation_id ==conversation.id, Message.time >=datetime.datetime.now() - datetime.timedelta(0,60*int(start))).all()
@@ -178,31 +212,17 @@ def API_retrieve_messages_with_start(phone_number,start):
         messages.append(messageObj.asJsonObj())
     return jsonify(messages)
 
-################################################################################
-#                                CONVERSATION
-################################################################################
-def create_conversation(conversation_phone_number):
-    conversationObj = Conversation(phoneNumber=conversation_phone_number,user_id=g_user["ID"])
-    db.session.add(conversationObj)
-    db.session.commit()
-    return conversationObj
 
-def retrieve_conversation(conversation_phone_number):
-    conversationObj = Conversation.query.filter_by(user_id=g_user["ID"],phoneNumber=conversation_phone_number).first()
-    if conversationObj is None:
-        raise NotFound
-    return conversationObj
-
-################################################################################
-#                                USER
-################################################################################
+######################################
+#                User                #
+######################################
 @app.route('/user/',methods=['POST'])
-def create_user():
+def createUser():
     jsonMustHave = ["username","password"]
     if not request.json or not set(jsonMustHave).issubset(set(request.json)):
         abort(400,"JSON Request must contain:"+str(jsonMustHave))
     
-    if retrieve_user(request.json["username"]) is None:
+    if _retrieveUser(request.json["username"]) is None:
         userObj = User(username = request.json["username"],password = custom_app_context.hash(request.json["password"]),creation_time = datetime.datetime.now())
         db.session.add(userObj)
         db.session.commit()
@@ -213,14 +233,15 @@ def create_user():
     else:
         abort(400,"User already exists.")
 
-def retrieve_user(username):
+def _retrieveUser(username):
     UserObj = User.query.filter(User.username == username).first()
     return UserObj
-################################################################################
-#                                OTHER STUFF
-################################################################################
+
+###########################################
+#                Utilities                #
+###########################################
 @auth.verify_password
-def verify_password(username,password):
+def _verifyPassword(username,password):
     userObj = User.query.filter(User.username == username).first()
     if userObj is None:
         return False
@@ -252,9 +273,6 @@ def validLogin():
     return jsonify({"answer":"True"})
 
 
-
-
-
 if __name__ == '__main__':
     if debug:
         db.drop_all()
@@ -268,27 +286,5 @@ app.run(host="0.0.0.0",port=80)
 
 
 
-##############################################
-#                CONVERSATION                #
-##############################################
-@app.route('/conversation/', methods=['GET'])
-@auth.login_required
-def retrieveAllConverstaions():
-    ConverastionArray = Conversation.query.filter(Conversation.user_id == g_user["ID"]).all()
-    convArrayInJson = []
-    for convObj in ConverastionArray:
-        convArrayInJson.append(convObj.asJsonObj())
-    return jsonify(convArrayInJson)
 
-#########################################
-#                MESSAGE                #
-#########################################
-@app.route('/message/<phone_number>', methods=['GET'])
-@auth.login_required
-def retrieveAllMessages(phone_number):
-    messageArray = Message.query.filter(Message.from_phoneNumber == phone_number).all()
-    messageArrayInJson = []
-    for msg in messageArray:
-        messageArrayInJson.append(msg.asJsonObj())
-    return jsonify(messageArrayInJson)
     
