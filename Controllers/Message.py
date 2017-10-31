@@ -1,4 +1,5 @@
 import datetime
+import traceback
 
 from flask_restful import Resource, reqparse
 from flask import request, jsonify, json
@@ -27,6 +28,7 @@ class MessageByPhoneNumber(Resource):
         return jsonify(messages)
     
     def post(self):
+        
         parser = reqparse.RequestParser()
         parser.add_argument('CONVERSATIONNUMBER',required=True, type=int, location='json')
         parser.add_argument('FROM',required=True, type=int, location='json')
@@ -34,7 +36,6 @@ class MessageByPhoneNumber(Resource):
         parser.add_argument('MESSAGE',required=True, type=str, location='json')
         parser.add_argument('CLIENT',required=True, type=str, location='json')
         args = parser.parse_args(strict=True)
-        
         try:
             conversation = CConversation._retrieveConversation(args.get("CONVERSATIONNUMBER"))
         except NotFound:
@@ -46,14 +47,21 @@ class MessageByPhoneNumber(Resource):
                        conversation_id=conversation.id)
         db.session.add(messageObj)
         db.session.commit()
-         
-        client.connect("0.0.0.0",1883,60)
-        mqtt_message = {
-            "CONVERSATIONNUMBER":args.get("CONVERSATIONNUMBER"),
-            "CLIENT":args.get("CLIENT"),
-            "MESSAGEID":messageObj.id}
-        client.publish(g_user.userObj["USERNAME"],json.dumps(mqtt_message))
-        client.disconnect()
+        
+        try:
+            #TODO check table to see if any messages need to be sent.
+            client.connect("0.0.0.0",1883,60)
+            mqtt_message = {
+                "CONVERSATIONNUMBER":args.get("CONVERSATIONNUMBER"),
+                "CLIENT":args.get("CLIENT"),
+                "MESSAGEID":messageObj.id}
+            client.publish(g_user.userObj["USERNAME"],json.dumps(mqtt_message))
+            client.disconnect()
+        except OSError:
+            #TODO Write to a table, to check again later.
+            pass
+        except Exception:
+            traceback.print_exc()
           
         return jsonify(messageObj.asJsonObj())
 

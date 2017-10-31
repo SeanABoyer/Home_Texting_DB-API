@@ -3,7 +3,7 @@ import os
 #        FLASK        #
 from flask import Flask, make_response, jsonify
 from flask_restful import Api
-from config import DatabaseFile, debug
+from Other.config import DatabaseFile, debug
 
 
 #        CONTROLLERS        #
@@ -17,7 +17,7 @@ from Other.SharedResources import db, g_user, auth
 
 
 app = Flask(__name__)
-app.config.from_object('config')
+app.config.from_object('Other.config')
 ################################
 #        DATABASE STUFF        #
 ################################
