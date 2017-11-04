@@ -1,0 +1,63 @@
+
+<!-- All Credit for Design to http://www.bypeople.com/css-chat/ -- https://codepen.io/Momciloo/pen/bEdbxY -->
+<html>
+	<head>
+	    <meta charset="utf-8">
+		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='base.css') }}"></link>
+		
+		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+		<script src="https://cdn.rawgit.com/Luegg/angularjs-scroll-glue/master/src/scrollglue.js"></script>
+
+	    <script src="{{url_for('static', filename='main.js')}}"></script>
+	    <script src="{{url_for('static', filename='main_angular.js')}}"></script>
+
+	</head>
+	<body style="background-image:url({{url_for('static', filename='background.jpg')}})">
+	
+		<div class="wrapper" ng-app="HomeTextingApp">
+		    <div class="container" ng-controller="HomeTextingController">
+		        <div class="left">
+		            <div class="top">
+		                <input type="text" />
+		                <a href="javascript:;" class="search"></a>
+		            </div>
+		            <div class="peopleContainer">
+			            <ul class="people">
+			                <li ng-click="conversationClicked(conversation)" ng-repeat="conversation in conversations" ng-class="getPersonClass(conversation)">
+			                     <!-- 
+			                    <img src="https://s13.postimg.org/ih41k9tqr/img1.jpg" alt="" />
+			                     -->
+			                    <span class="badge" data-badge="{{' {{conversation.unreadCount}}'}}" ng-show="conversation.unreadCount > 0"></span>
+			                    <span class="name">{{'{{conversation.name}}'}}</span>
+			                    <span class="time">{{'{{conversation.lastMessageTime}}'}}</span>
+			                    <span class="preview">{{'{{conversation.lastMesssage.message}}'}}</span>
+			                </li>	
+			            </ul>
+		            </div>
+		        </div>
+		        <div class="right">
+		            <div class="top"><span>To: <span class="name">{{'{{activeConversation.name}}'}}</span></span></div>
+		            <div class="chat active-chat" data-chat="person1">
+			            <div id="scrollContainer" scroll-glue>
+			                <!-- 
+			                <div class="conversation-start">
+			                    <span>Today, 6:48 AM</span>
+			                </div>
+			                 -->
+			                <div ng-repeat="message in activeConversation.messages" ng-class="getMessageClass(message)">
+			                    {{'{{message.message}}'}}
+			                </div>
+	                	</div>
+		            </div>
+		            <div class="write">
+		                <a href="javascript:;" class="write-link attach"></a>
+		                <input type="text" ng-model="messageTextBox"/>
+		                <a href="javascript:;" class="write-link smiley"></a>
+		                <a href="javascript:;" class="write-link send" ng-click="sendMessage(activeConversation)"></a>
+		            </div>
+		        </div>
+		    </div>
+		</div>
+	</body>
+</html>

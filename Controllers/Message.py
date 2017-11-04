@@ -28,7 +28,6 @@ class MessageByPhoneNumber(Resource):
         return jsonify(messages)
     
     def post(self):
-        
         parser = reqparse.RequestParser()
         parser.add_argument('CONVERSATIONNUMBER',required=True, type=int, location='json')
         parser.add_argument('FROM',required=True, type=int, location='json')
@@ -68,6 +67,9 @@ class MessageByPhoneNumber(Resource):
 class MessageByPhoneID(Resource):
     method_decorators = [require_auth]
     def get(self,CONVERSATIONNUMBER,ID):
+        messages = []
         conversation = CConversation._retrieveConversation(CONVERSATIONNUMBER);
-        messageobj = MMessage.query.filter(MMessage.conversation_id==conversation.id,MMessage.id==ID).first()
-        return jsonify(messageobj.asJsonObj())
+        messagesObj = MMessage.query.filter(MMessage.conversation_id==conversation.id,MMessage.id>=ID).all()
+        for messageObj in messagesObj:
+            messages.append(messageObj.asJsonObj())
+        return jsonify(messages)
