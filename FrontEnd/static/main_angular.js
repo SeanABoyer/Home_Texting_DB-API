@@ -1,34 +1,125 @@
 
 
-var app = angular.module('HomeTextingApp', ['luegg.directives']);
-app.controller('HomeTextingController', function($scope, $http) {
-
-	var Auth = {"Authorization":"Basic U2VhbjpwYXNz"};
+var app = angular.module('HomeTextingApp', ['luegg.directives','base64']);
+app.controller('HomeTextingController', function($scope, $http, $timeout,$base64,$location) {
+	/*	Initilize Variables	*/
+	$scope.validLogin = false;
+	$scope.dataInitilized = false;
+	$scope.UserObj = {
+			"username":"",
+			"password":"",
+			"phoneNumber":"",
+			"serverIP":$location.host(),
+			"updateAuth": function(){
+				var auth = $base64.encode($scope.UserObj.username+":"+$scope.UserObj.password);
+				$scope.UserObj.basicAuth = {"Authorization":"Basic "+auth};
+					},
+			"basicAuth":null
+	}
+	$scope.LoginRunning = false;
+	toastr.options.newestOnTop = true;
 	$scope.conversations = [];
-	$http.get("http://localhost/conversation/18307652286/",{"headers":Auth}).then(function(result){
-		for(var i = 0; result.data.length > i; i++){
-			$scope.conversations.push(new Conversation(result.data[i].CONVERSATIONNUMBER));
+	$scope.messageTextBox = "";
+	/*	End Initilize Variables	*/
+	
+	/*	Define Classes*/
+	class Conversation{
+		constructor(number){
+			var c = this;
+			this.unreadCount = 0;
+			this.number = number;
+			this.name = number;
+			this.lastMessageTime = "3:00PM";
+			this.messages = [];
+			this.lastMessage = null;
+			this.updateMessages = function() {
+				if(c.lastMessage == null){
+					return;
+				}
+				$http.get("http://"+$scope.UserObj.serverIP+"/message/by/ID/"+c.number+"/"+(Number(c.lastMessage.id)+1)+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+					for(var j = 0; result.data.length > j; j++){
+						var tempMsg = new Message(result.data[j].ID,result.data[j].MESSAGE,result.data[j].TO,result.data[j].FROM,result.data[j].TIME);
+						c.AddMessage(tempMsg);
+					}
+				}, function(result){
+					toastr.error("Updating Messages to "+c.number);
+				});	
+			}
+			this.AddMessage = function(message) {
+				if(this != $scope.activeConversation){
+					this.unreadCount+=1;
+				}
+				this.messages.push(message);
+				this.lastMessage = message;
+				this.lastMessageTime = message.time;
+			}
+			$http.get("http://"+$scope.UserObj.serverIP+"/message/by/ID/"+number+"/0/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+				for(var j = 0; result.data.length > j; j++){
+					c.AddMessage(new Message(result.data[j].ID,result.data[j].MESSAGE,result.data[j].TO,result.data[j].FROM,result.data[j].TIME))
+				}
+				c.unreadCount = 0;
+			}, function(result){
+				toastr.error("Adding Message to "+c.number);
+			});	
 		}
-	}, function(result){
-		console.log("ERROR");
-	});
-	$scope.activeConversation = $scope.conversations[0];
-
-	$scope.conversationClicked = function(conversation) {
-		//Find All active Convs and Make them inactive
-		for(var i = 0; $scope.conversations.length > i; i++){
-			$scope.conversations[i].active = false;
+	}
+	class Message{
+		constructor(id,message, To, From, time){
+			this.numberTO = To;
+			this.numberFrom = From;
+			this.message = message;
+//			this.time = time;
+			this.id = id;
+			this.time = "2:00PM";
 		}
-		//Find the conv that was clicked and make it active
-		$scope.activeConversation = $scope.conversations[$scope.conversations.indexOf(conversation)];
-		$scope.activeConversation.active = true;
-		conversation.unreadCount = 0;
+	}
+	/*	End Define Classes */
+	$scope.Login = function(){
+		if($scope.LoginRunning){
+			return;
+		}
+		$scope.LoginRunning = true;
+		toastr["info"]("Testing Server IP.");
+		$http.get("http://"+$scope.UserObj.serverIP+"/validateIP/",{timeout:2000}).then(function(result){
+			toastr.remove();
+			toastr.success("Valid Server IP.");
+			toastr["info"]("Validating Credentials.");
+			$http.get("http://"+$scope.UserObj.serverIP+"/validateLogin/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+				toastr.remove();
+				toastr.success("Credentials Valid. Access Granted.");
+				
+				$scope.UserObj.phoneNumber = result.data.phoneNumber;
+				$scope.validLogin = true;
+				$scope.initilizeData();
+				$scope.LoginRunning = false;
+			},function(result){
+				toastr.error("Credentials Invalid. Access Denied.");
+				$scope.LoginRunning = false;
+			});
+		},function(result){
+			toastr.remove();
+			toastr.error("Invalid Server IP.");
+			$scope.LoginRunning = false;
+		});
 	}
 	
-	
+	$scope.initilizeData = function(){
+		//Get all Conversations
+		$http.get("http://"+$scope.UserObj.serverIP+"/conversation/"+$scope.UserObj.phoneNumber+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+			for(var i = 0; result.data.length > i; i++){
+				$scope.conversations.push(new Conversation(result.data[i].CONVERSATIONNUMBER));
+			}
+			$scope.activeConversation = $scope.conversations[0];
+			$scope.dataInitilized = true;
+		}, function(result){
+			toastr.error("Initilazing Conversations");
+		});
+	}
 	setInterval(function(){
-		
-		$http.get("http://localhost/conversation/18307652286/",{"headers":Auth}).then(function(result){
+		if(!$scope.validLogin && !$scope.dataInitilized){
+			return;
+		}
+		$http.get("http://"+$scope.UserObj.serverIP+"/conversation/"+$scope.UserObj.phoneNumber+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
 			var convArray = [];
 			for(var i = 0; result.data.length > i; i++){
 				convArray.push(result.data[i].CONVERSATIONNUMBER);
@@ -48,24 +139,43 @@ app.controller('HomeTextingController', function($scope, $http) {
 			}
 			
 		}, function(result){
-			console.log("ERROR");
+			toastr.error("Updating Conversations on Interval");
 		});
 
 		}, 15000)
-	$scope.messageTextBox;
+	$scope.conversationClicked = function(conversation) {
+		//Find All active Convs and Make them inactive
+		for(var i = 0; $scope.conversations.length > i; i++){
+			$scope.conversations[i].active = false;
+		}
+		//Find the conv that was clicked and make it active
+		$scope.activeConversation = $scope.conversations[$scope.conversations.indexOf(conversation)];
+		$scope.activeConversation.active = true;
+		conversation.unreadCount = 0;
+	}
+
+	$scope.submit = function(event){
+		if(event.keyCode == 13){
+			$scope.sendMessage($scope.activeConversation);
+		}
+	}
+	
 	$scope.sendMessage = function(conversation){
-		
+		if ($scope.messageTextBox == "" || $scope.messageTextBox == null){
+			return
+		}
 		var data = {"CONVERSATIONNUMBER":conversation.number,
-					"FROM":"18307652286",
+					"FROM":$scope.UserObj.phoneNumber,
 					"TO":conversation.number,
 					"MESSAGE":$scope.messageTextBox,
 					"CLIENT":"WEB"
 					}
-		$scope.messageTextBox = "";
-		$http.post("http://localhost/message/by/PhoneNumber/",data,{"headers":Auth}).then(function(result){
-			console.log(result);
+		
+		$http.post("http://"+$scope.UserObj.serverIP+"/message/by/PhoneNumber/",data,{"headers":$scope.UserObj.basicAuth}).then(function(result){
+			$scope.messageTextBox = "";
+			conversation.AddMessage(new Message(result.data.ID,result.data.MESSAGE, result.data.TO, result.data.FROM, result.data.TIME));
 		}, function(result){
-			console.log(result);
+			toastr.error("Message failed to deliver to server.");
 		});	
 	}
 	
@@ -86,55 +196,7 @@ app.controller('HomeTextingController', function($scope, $http) {
 		return classes;
 	}
 	
-	class Conversation{
-		constructor(number){
-			var c = this;
-			this.unreadCount = 0;
-			this.number = number;
-			this.name = number;
-			this.lastMessageTime = "3:00PM";
-			this.messages = [];
-			this.lastMesssage = null;
-			this.updateMessages = function() {
-				$http.get("http://localhost/message/by/ID/"+c.number+"/"+(Number(c.lastMesssage.id)+1)+"/",{"headers":Auth}).then(function(result){
-					for(var j = 0; result.data.length > j; j++){
-						var tempMsg = new Message(result.data[j].ID,result.data[j].MESSAGE,result.data[j].TO,result.data[j].FROM,result.data[j].TIME);
-						c.AddMessage(tempMsg);
 
-						
-					}
-				}, function(result){
-					console.log("ERROR");
-				});	
-			}
-			this.AddMessage = function(message) {
-				if(this != $scope.activeConversation){
-					this.unreadCount+=1;
-				}
-				this.messages.push(message);
-				this.lastMesssage = message;
-				this.lastMessageTime = message.time;
-			}
-			$http.get("http://localhost/message/by/ID/"+number+"/0/",{"headers":Auth}).then(function(result){
-				for(var j = 0; result.data.length > j; j++){
-					c.AddMessage(new Message(result.data[j].ID,result.data[j].MESSAGE,result.data[j].TO,result.data[j].FROM,result.data[j].TIME))
-				}
-				c.unreadCount = 0;
-			}, function(result){
-				console.log("ERROR");
-			});	
-		}
-	}
-	class Message{
-		constructor(id,message, To, From, time){
-			this.numberTO = To;
-			this.numberFrom = From;
-			this.message = message;
-//			this.time = time;
-			this.id = id;
-			this.time = "2:00PM";
-		}
-	}
 });
 
 

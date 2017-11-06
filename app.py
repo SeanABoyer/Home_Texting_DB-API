@@ -91,4 +91,4 @@ def add_header(r):
 # def bad_request(error):
 #     return make_response(jsonify({"ERROR":str(error)}),400)
 
-app.run(host="0.0.0.0",port=80)
+app.run(host="0.0.0.0",port=80,threaded=True)

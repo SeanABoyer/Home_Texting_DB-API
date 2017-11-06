@@ -5,19 +5,37 @@
 	    <meta charset="utf-8">
 		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='base.css') }}"></link>
 		
+		
+				
 		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
 		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
 		<script src="https://cdn.rawgit.com/Luegg/angularjs-scroll-glue/master/src/scrollglue.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/angular-base64/2.0.5/angular-base64.min.js"></script>
+		
 
 	    <script src="{{url_for('static', filename='main.js')}}"></script>
 	    <script src="{{url_for('static', filename='main_angular.js')}}"></script>
 
+		<!-- toastr -->
+		<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"></link>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+		<!-- End toastr -->
 	</head>
 	<body style="background-image:url({{url_for('static', filename='background.jpg')}})">
 	
 		<div class="wrapper" ng-app="HomeTextingApp">
 		    <div class="container" ng-controller="HomeTextingController">
-		        <div class="left">
+		    <notification ></notification>
+		    	<div id="LoginInfo" ng-show="!validLogin">
+					<div class="login">
+						<input type="text" placeholder="Server IP Address" id="serverIP" ng-model="UserObj.serverIP">
+					  	<input type="text" placeholder="Username" id="username" ng-model="UserObj.username" ng-change="UserObj.updateAuth()">  
+					  	<input type="password" placeholder="Password" id="password"ng-model="UserObj.password" ng-change="UserObj.updateAuth()">  
+					  	<a href="#" class="forgot">forgot password?</a>
+					  	<input type="submit" value="Sign In" ng-click="Login()">
+					</div>
+		    	</div>
+		        <div class="left" ng-show="validLogin")>
 		            <div class="top">
 		                <input type="text" />
 		                <a href="javascript:;" class="search"></a>
@@ -31,12 +49,12 @@
 			                    <span class="badge" data-badge="{{' {{conversation.unreadCount}}'}}" ng-show="conversation.unreadCount > 0"></span>
 			                    <span class="name">{{'{{conversation.name}}'}}</span>
 			                    <span class="time">{{'{{conversation.lastMessageTime}}'}}</span>
-			                    <span class="preview">{{'{{conversation.lastMesssage.message}}'}}</span>
+			                    <span class="preview">{{'{{conversation.lastMessage.message}}'}}</span>
 			                </li>	
 			            </ul>
 		            </div>
 		        </div>
-		        <div class="right">
+		        <div class="right" ng-show="validLogin">
 		            <div class="top"><span>To: <span class="name">{{'{{activeConversation.name}}'}}</span></span></div>
 		            <div class="chat active-chat" data-chat="person1">
 			            <div id="scrollContainer" scroll-glue>
@@ -52,7 +70,7 @@
 		            </div>
 		            <div class="write">
 		                <a href="javascript:;" class="write-link attach"></a>
-		                <input type="text" ng-model="messageTextBox"/>
+		                <input type="text" ng-model="messageTextBox" ng-keypress="submit($event)"/>
 		                <a href="javascript:;" class="write-link smiley"></a>
 		                <a href="javascript:;" class="write-link send" ng-click="sendMessage(activeConversation)"></a>
 		            </div>
