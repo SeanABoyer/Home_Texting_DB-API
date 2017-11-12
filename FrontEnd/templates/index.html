@@ -20,6 +20,10 @@
 		<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"></link>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 		<!-- End toastr -->
+		
+		<!-- PAHO-MQTT -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+		<!-- END PAHO-MQTT -->
 	</head>
 	<body style="background-image:url({{url_for('static', filename='background.jpg')}})">
 	
@@ -28,9 +32,9 @@
 		    <notification ></notification>
 		    	<div id="LoginInfo" ng-show="!validLogin">
 					<div class="login">
-						<input type="text" placeholder="Server IP Address" id="serverIP" ng-model="UserObj.serverIP">
-					  	<input type="text" placeholder="Username" id="username" ng-model="UserObj.username" ng-change="UserObj.updateAuth()">  
-					  	<input type="password" placeholder="Password" id="password"ng-model="UserObj.password" ng-change="UserObj.updateAuth()">  
+						<!-- <input type="text" placeholder="Server IP Address" id="serverIP" ng-model="UserObj.serverIP"> -->
+					  	<input type="text" placeholder="Username" id="username" ng-model="UserObj.username" ng-change="UserObj.updateAuth()" ng-keypress="LoginbyKey($event)">  
+					  	<input type="password" placeholder="Password" id="password"ng-model="UserObj.password" ng-change="UserObj.updateAuth()" ng-keypress="LoginbyKey($event)">  
 					  	<a href="#" class="forgot">forgot password?</a>
 					  	<input type="submit" value="Sign In" ng-click="Login()">
 					</div>
@@ -69,9 +73,7 @@
 	                	</div>
 		            </div>
 		            <div class="write">
-		                <a href="javascript:;" class="write-link attach"></a>
 		                <input type="text" ng-model="messageTextBox" ng-keypress="submit($event)"/>
-		                <a href="javascript:;" class="write-link smiley"></a>
 		                <a href="javascript:;" class="write-link send" ng-click="sendMessage(activeConversation)"></a>
 		            </div>
 		        </div>

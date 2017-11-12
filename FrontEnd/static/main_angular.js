@@ -1,10 +1,9 @@
 
 
 var app = angular.module('HomeTextingApp', ['luegg.directives','base64']);
-app.controller('HomeTextingController', function($scope, $http, $timeout,$base64,$location) {
+app.controller('HomeTextingController', function($scope, $http, $timeout,$base64,$location,$filter) {
 	/*	Initilize Variables	*/
 	$scope.validLogin = false;
-	$scope.dataInitilized = false;
 	$scope.UserObj = {
 			"username":"",
 			"password":"",
@@ -32,19 +31,6 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 			this.lastMessageTime = "3:00PM";
 			this.messages = [];
 			this.lastMessage = null;
-			this.updateMessages = function() {
-				if(c.lastMessage == null){
-					return;
-				}
-				$http.get("http://"+$scope.UserObj.serverIP+"/message/by/ID/"+c.number+"/"+(Number(c.lastMessage.id)+1)+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
-					for(var j = 0; result.data.length > j; j++){
-						var tempMsg = new Message(result.data[j].ID,result.data[j].MESSAGE,result.data[j].TO,result.data[j].FROM,result.data[j].TIME);
-						c.AddMessage(tempMsg);
-					}
-				}, function(result){
-					toastr.error("Updating Messages to "+c.number);
-				});	
-			}
 			this.AddMessage = function(message) {
 				if(this != $scope.activeConversation){
 					this.unreadCount+=1;
@@ -59,7 +45,7 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 				}
 				c.unreadCount = 0;
 			}, function(result){
-				toastr.error("Adding Message to "+c.number);
+				toastr.error("Error adding messages to "+c.number);
 			});	
 		}
 	}
@@ -74,8 +60,34 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 		}
 	}
 	/*	End Define Classes */
+	
+	function getConversations(){
+		$http.get("http://"+$scope.UserObj.serverIP+"/conversation/"+$scope.UserObj.phoneNumber+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+			for(var i = 0; result.data.length > i; i++){
+				$scope.conversations.push(new Conversation(result.data[i].CONVERSATIONNUMBER));
+			}
+			$scope.activeConversation = $scope.conversations[0];
+		}, function(result){
+			toastr.error("Initilazing Conversations");
+		});
+	}
+	$scope.conversationClicked = function(conversation) {
+		//Find All active Convs and Make them inactive
+		for(var i = 0; $scope.conversations.length > i; i++){
+			$scope.conversations[i].active = false;
+		}
+		//Find the conv that was clicked and make it active
+		$scope.activeConversation = $scope.conversations[$scope.conversations.indexOf(conversation)];
+		$scope.activeConversation.active = true;
+		conversation.unreadCount = 0;
+	}
+	/*	Login	*/
 	$scope.Login = function(){
 		if($scope.LoginRunning){
+			return;
+		}
+		if ($scope.UserObj.username == "" || $scope.UserObj.password == ""){
+			toastr.error("Please supply a username and password.");
 			return;
 		}
 		$scope.LoginRunning = true;
@@ -87,11 +99,11 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 			$http.get("http://"+$scope.UserObj.serverIP+"/validateLogin/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
 				toastr.remove();
 				toastr.success("Credentials Valid. Access Granted.");
-				
 				$scope.UserObj.phoneNumber = result.data.phoneNumber;
 				$scope.validLogin = true;
-				$scope.initilizeData();
+				getConversations();
 				$scope.LoginRunning = false;
+				connectToMQTT();
 			},function(result){
 				toastr.error("Credentials Invalid. Access Denied.");
 				$scope.LoginRunning = false;
@@ -102,64 +114,17 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 			$scope.LoginRunning = false;
 		});
 	}
-	
-	$scope.initilizeData = function(){
-		//Get all Conversations
-		$http.get("http://"+$scope.UserObj.serverIP+"/conversation/"+$scope.UserObj.phoneNumber+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
-			for(var i = 0; result.data.length > i; i++){
-				$scope.conversations.push(new Conversation(result.data[i].CONVERSATIONNUMBER));
-			}
-			$scope.activeConversation = $scope.conversations[0];
-			$scope.dataInitilized = true;
-		}, function(result){
-			toastr.error("Initilazing Conversations");
-		});
-	}
-	setInterval(function(){
-		if(!$scope.validLogin && !$scope.dataInitilized){
-			return;
+	$scope.LoginbyKey = function (event){
+		if(event.keyCode == 13){
+			$scope.Login();
 		}
-		$http.get("http://"+$scope.UserObj.serverIP+"/conversation/"+$scope.UserObj.phoneNumber+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
-			var convArray = [];
-			for(var i = 0; result.data.length > i; i++){
-				convArray.push(result.data[i].CONVERSATIONNUMBER);
-			}
-			for(var i = 0; $scope.conversations.length > i; i++){
-				//Check if convArray contains the conversation. if yes. Remove it from the list. If not. do nothing.
-				if(convArray.includes($scope.conversations[i].number)){
-					//If Conversation Exist
-					//remove it from convArray and update messages.
-					convArray.splice(convArray.indexOf($scope.conversations[i].number),1);
-					$scope.conversations[i].updateMessages();
-				}
-			}
-			//loop through all convs that were not removed and create new conversations for them.
-			for(var i = 0; convArray.length > i; i++){
-				$scope.conversations.push(new Conversation(convArray[i]));
-			}
-			
-		}, function(result){
-			toastr.error("Updating Conversations on Interval");
-		});
-
-		}, 15000)
-	$scope.conversationClicked = function(conversation) {
-		//Find All active Convs and Make them inactive
-		for(var i = 0; $scope.conversations.length > i; i++){
-			$scope.conversations[i].active = false;
-		}
-		//Find the conv that was clicked and make it active
-		$scope.activeConversation = $scope.conversations[$scope.conversations.indexOf(conversation)];
-		$scope.activeConversation.active = true;
-		conversation.unreadCount = 0;
-	}
-
+	}	
+	/*	Sending Messages	*/
 	$scope.submit = function(event){
 		if(event.keyCode == 13){
 			$scope.sendMessage($scope.activeConversation);
 		}
 	}
-	
 	$scope.sendMessage = function(conversation){
 		if ($scope.messageTextBox == "" || $scope.messageTextBox == null){
 			return
@@ -168,17 +133,17 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 					"FROM":$scope.UserObj.phoneNumber,
 					"TO":conversation.number,
 					"MESSAGE":$scope.messageTextBox,
-					"CLIENT":"WEB"
+					"CLIENT":"AngularClient-"+$scope.UserObj.username
 					}
 		
 		$http.post("http://"+$scope.UserObj.serverIP+"/message/by/PhoneNumber/",data,{"headers":$scope.UserObj.basicAuth}).then(function(result){
-			$scope.messageTextBox = "";
 			conversation.AddMessage(new Message(result.data.ID,result.data.MESSAGE, result.data.TO, result.data.FROM, result.data.TIME));
 		}, function(result){
 			toastr.error("Message failed to deliver to server.");
 		});	
+		$scope.messageTextBox = "";
 	}
-	
+	/* Dynamic Classes	*/
 	$scope.getPersonClass = function (conversation){
 		var classes = {"person":true, "activeConv":false}
 		if ($scope.conversations.indexOf($scope.activeConversation) == $scope.conversations.indexOf(conversation)) {
@@ -194,9 +159,37 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 			classes.you = true;
 		}
 		return classes;
+	}	
+	/*	[MQTT]Recieving Messages	*/
+	function connectToMQTT(){
+		client = new Paho.MQTT.Client($scope.UserObj.serverIP,Number(1884),"AngularClient-"+$scope.UserObj.username);
+		client.onConnectionLost = onConnectionLost;
+		client.onMessageArrived = onMessageArrived;
+		client.connect({onSuccess:onConnect,onFailure:onFail});
 	}
-	
-
+	function onConnectionLost(responseObject) {
+		toastr.error("Lost connection to message server.");
+	    console.log("onConnectionLost:"+responseObject);
+	}
+	function onMessageArrived(message) {
+		var JsonMessage = JSON.parse(message.payloadString);
+		if(JsonMessage.CLIENT != "AngularClient-"+$scope.UserObj.username){
+			$http.get("http://"+$scope.UserObj.serverIP+"/message/by/ID/"+JsonMessage.CONVERSATIONNUMBER+"/"+(Number(JsonMessage.MESSAGEID))+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+				var conversation = $filter('filter')($scope.conversations, {"number":JsonMessage.CONVERSATIONNUMBER})[0];
+				var messageOBJ = result.data[0];
+				conversation.AddMessage(new Message(messageOBJ.ID,messageOBJ.MESSAGE,messageOBJ.TO,messageOBJ.FROM,messageOBJ.TIME))
+			}, function(result){
+				toastr.error("Updating Messages to "+c.number);
+			});	
+		}
+	}
+	function onConnect() {
+		toastr.success("Connected to message server.");
+		client.subscribe($scope.UserObj.username);
+	}
+	function onFail(){
+		toast.error("Failed to connect to message server.");
+	}
 });
 
 
