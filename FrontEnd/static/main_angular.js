@@ -183,7 +183,13 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 				if(conversation){
 					conversation.AddMessage(newMessage);
 				} else {
-					var newConversation = new Conversation(messageOBJ.FROM);
+					if(messageOBJ.TO == $scope.UserObj.phoneNumber){
+						var newConversation = new Conversation(messageOBJ.FROM);
+					}
+					else {
+						var newConversation = new Conversation(messageOBJ.TO);
+					}
+					
 					newConversation.AddMessage(newMessage);
 					$scope.conversations.push(newConversation);
 				}
