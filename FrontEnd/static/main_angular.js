@@ -8,7 +8,8 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 			"username":"",
 			"password":"",
 			"phoneNumber":"",
-			"serverIP":$location.host(),
+			//"serverIP":$location.host(),
+			"serverIP":"192.168.1.2",
 			"updateAuth": function(){
 				var auth = $base64.encode($scope.UserObj.username+":"+$scope.UserObj.password);
 				$scope.UserObj.basicAuth = {"Authorization":"Basic "+auth};
@@ -175,9 +176,17 @@ app.controller('HomeTextingController', function($scope, $http, $timeout,$base64
 		var JsonMessage = JSON.parse(message.payloadString);
 		if(JsonMessage.CLIENT != "AngularClient-"+$scope.UserObj.username){
 			$http.get("http://"+$scope.UserObj.serverIP+"/message/by/ID/"+JsonMessage.CONVERSATIONNUMBER+"/"+(Number(JsonMessage.MESSAGEID))+"/",{"headers":$scope.UserObj.basicAuth}).then(function(result){
+				//TODO:: What if a conversation does not exist?
 				var conversation = $filter('filter')($scope.conversations, {"number":JsonMessage.CONVERSATIONNUMBER})[0];
 				var messageOBJ = result.data[0];
-				conversation.AddMessage(new Message(messageOBJ.ID,messageOBJ.MESSAGE,messageOBJ.TO,messageOBJ.FROM,messageOBJ.TIME))
+				var newMessage = new Message(messageOBJ.ID,messageOBJ.MESSAGE,messageOBJ.TO,messageOBJ.FROM,messageOBJ.TIME)
+				if(conversation){
+					conversation.AddMessage(newMessage);
+				} else {
+					var newConversation = new Conversation(messageOBJ.FROM);
+					newConversation.AddMessage(newMessage);
+					$scope.conversations.push(newConversation);
+				}
 			}, function(result){
 				toastr.error("Updating Messages to "+c.number);
 			});	
